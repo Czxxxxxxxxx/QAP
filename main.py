@@ -38,9 +38,12 @@ class EvolutionaryAlgorithm:
         self.data_filename = data_filename
         self.ReadFile()
 
-        self.population.append(Individual(5,[1,2,3,4,5]))
-        self.insert_mutation()
+        self.population.append(Individual(9,[1,2,3,4,5,6,7,8,9]))
+        self.population.append(Individual(9,[9,3,7,8,2,6,5,1,4]))
+        # self.insert_mutation()
+        self.order_crossover()
         print(self.population[0].chromosome)
+        print(self.population[1].chromosome)  
 
     def ReadFile(self):
         # 从文件中读取数据
@@ -106,10 +109,50 @@ class EvolutionaryAlgorithm:
                 index1 = random.randint(0, individual.chromosome_length - 1)
                 index2 = random.randint(0, individual.chromosome_length - 1)
                 #插入
-                print(index1,index2)
+                # print(index1,index2)
                 gene = individual.chromosome.pop(index2)
                 individual.chromosome.insert(index1 + 1, gene)
 
+
+    def order_crossover(self): #序交叉
+        for i in range(0, self.population_size-1, 2):
+            if random.random() < self.crossover_rate: 
+                # 选择相邻个体交叉，随机选择两个交叉点
+                parent1 = self.population[i]
+                parent2 = self.population[i + 1]
+                
+                point1 = random.randint(0, parent1.chromosome_length - 1)
+                point2 = random.randint(0, parent1.chromosome_length - 1)
+                # 确定交叉点的较小和较大值
+                start = min(point1, point2)
+                end = max(point1, point2)
+                # 创建子代
+                offspring1 = [None] * parent1.chromosome_length
+                offspring2 = [None] * parent1.chromosome_length
+                # 将父代的交叉片段复制到子代的相同位置
+                offspring1[start:end+1] = parent1.chromosome[start:end+1]
+                offspring2[start:end+1] = parent2.chromosome[start:end+1]
+                # 从另一个父代的第二个交叉点开始填充子代
+                pointer_parent = end + 1
+                pointer_offspring = end + 1
+                while None in offspring1:
+                    if parent2.chromosome[pointer_parent] not in offspring1:
+                        offspring1[pointer_offspring] = parent2.chromosome[pointer_parent]
+                        pointer_offspring = (pointer_offspring + 1) % parent1.chromosome_length
+                    pointer_parent = (pointer_parent + 1) % parent1.chromosome_length
+
+                # 填充第二个子代
+                pointer_parent = end + 1
+                pointer_offspring = end + 1
+                while None in offspring2:
+                    if parent1.chromosome[pointer_parent] not in offspring2:
+                        offspring2[pointer_offspring] = parent1.chromosome[pointer_parent]
+                        pointer_offspring = (pointer_offspring + 1) % parent1.chromosome_length
+                    pointer_parent = (pointer_parent + 1) % parent1.chromosome_length
+                
+                 # 创建子代个体并替换父代个体
+                self.population[i] = Individual(parent1.chromosome_length,offspring1)
+                self.population[i + 1] = Individual(parent1.chromosome_length,offspring2)
 
 #计算总运输成本
 def getcost(D,F,perm):
@@ -127,4 +170,4 @@ def getcost(D,F,perm):
 
 if __name__ == '__main__':
     datafile = "./qapdata/nug12.dat"
-    EvolutionaryAlgorithm(population_size=100,fitness_function=getcost,mutation_rate=1,crossover_rate=0.1,data_filename=datafile)
+    EvolutionaryAlgorithm(population_size=2,fitness_function=getcost,mutation_rate=1,crossover_rate=1,data_filename=datafile)
