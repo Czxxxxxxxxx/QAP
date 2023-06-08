@@ -8,7 +8,8 @@ import math
 script_directory = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_directory)
 
-
+globalbest = None
+cnt = None  #函数评估次数
 class Individual:
 
     def __init__(self, chromosome_length, list=None):
@@ -35,8 +36,8 @@ class Individual:
 
 class EvolutionaryAlgorithm:
 
-    def __init__(self, population_size,  fitness_function,
-                 mutation_rate, crossover_rate, data_filename):
+    def __init__(self, population_size, fitness_function, mutation_rate,
+                 crossover_rate, data_filename):
         self.population_size = population_size
         self.fitness_function = fitness_function
         self.mutation_rate = mutation_rate
@@ -58,41 +59,62 @@ class EvolutionaryAlgorithm:
     def run(self, num_generations):
         self.initialize_population()
         self.evaluate_population()
-        bestin = self.getBest()
-        bestin = self.taboo_search(bestin,100)
-        self.evaluate_population()
+
+        #找到初始化后，适应度值最低的个体，对其做禁忌搜索，然后在原种群中将其替换掉
+        min_fitness = float('inf')
+        min_individual = None
+        min_index = -1
+        for index, individual in enumerate(self.population):
+            fitness = individual.fitness
+            if fitness < min_fitness:
+                min_fitness = fitness
+                min_individual = individual
+                min_index = index
+
+        self.best_individual = self.tabu_search(min_individual, 100)
+        self.population[min_index] = self.best_individual
+        print(f"self.best_individual.fitness={self.best_individual.fitness}")
+
         for i in range(1, num_generations + 1):
-            self.newPop = [self.getBest()]  #精英保留
-            self.roulette_wheel_selection() #父代选择
-            # self.order_crossover()          #交叉之后，newpop的数量为原数量+1（保留了1个精英）
-            self.cycle_crossover()
+            self.getBest()
+            self.newPop = [self.best_individual]  #精英保留
+            self.roulette_wheel_selection()  #父代选择
+            self.order_crossover()  #交叉之后，newpop的数量为原数量+1（保留了1个精英）
+            # self.cycle_crossover()
             # self.insert_mutation()
             self.scramble_mutation()
-            self.evaluate_newPop()           #每一轮只做一次函数评估，在这里
+            self.evaluate_newPop()  #每一轮只做一次函数评估，在这里
             self.Substitude()
-            print(f'generation={i},bestchrome={self.population[0].chromosome},fitness={self.population[0].fitness}')
+            print(
+                f'generation={i},bestchrome={self.population[0].chromosome},fitness={self.population[0].fitness}'
+            )
         bestin = self.getBest()
         global cnt
         print(f'cnt={cnt}')
         print(f'bestchrome={bestin.chromosome},fitness={bestin.fitness}')
 
-    def taboo_search(self, individual, num_iterations): #禁忌搜索
+    def tabu_search(self, individual, num_iterations):  #禁忌搜索
         tabu_list = []
         current_individual = individual
         best_individual = individual
 
         for i in range(num_iterations):
             neighbors = self.generate_neighbors(current_individual)
-            feasible_neighbors = [neighbor for neighbor in neighbors if neighbor.chromosome not in tabu_list]
+            feasible_neighbors = [
+                neighbor for neighbor in neighbors
+                if neighbor.chromosome not in tabu_list
+            ]
 
             # 无可行邻域，提前结束搜索
             if not feasible_neighbors:
                 break
             #计算适应度
             for individual in feasible_neighbors:
-                individual.calculate_fitness(self.fitness_function, self.Matrix_D,self.Matrix_F)
+                individual.calculate_fitness(self.fitness_function,
+                                             self.Matrix_D, self.Matrix_F)
 
-            current_individual = min(feasible_neighbors, key=lambda x: x.fitness)
+            current_individual = min(feasible_neighbors,
+                                     key=lambda x: x.fitness)
             if current_individual.fitness < best_individual.fitness:
                 best_individual = current_individual
 
@@ -100,10 +122,15 @@ class EvolutionaryAlgorithm:
             # 更新禁忌列表，保持长度不超过邻域的大小
             if len(tabu_list) > len(neighbors):
                 tabu_list.pop(0)
-            
-            print(f'tabo:iteration={i},best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}')
+
+            # print(
+            #     f'tabu:iteration={i},best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}'
+            # )
+        print(
+            f'tabu:best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}'
+        )
         return best_individual
-    
+
     def generate_neighbors(self, individual):
         #遍历所有可能的交换一次的情况，作为当前个体的邻居
         neighbors = []
@@ -112,38 +139,49 @@ class EvolutionaryAlgorithm:
                 neighbor = self.swap_positions(individual, i, j)
                 neighbors.append(neighbor)
         return neighbors
-    
+
     def swap_positions(self, individual, i, j):
         permutation = copy.deepcopy(individual.chromosome[:])
         permutation[i], permutation[j] = permutation[j], permutation[i]
-        return Individual(chromosome_length=self.chromosome_length,list=permutation)
-    
+        return Individual(chromosome_length=self.chromosome_length,
+                          list=permutation)
+
     def roulette_wheel_selection(self):
-        total_fitness = sum(individual.fitness for individual in self.population)
-        probabilities = [individual.fitness / total_fitness for individual in self.population]
-        cumulative_probabilities = [sum(probabilities[:i+1]) for i in range(self.population_size)]
+        total_fitness = sum(individual.fitness
+                            for individual in self.population)
+        probabilities = [
+            individual.fitness / total_fitness
+            for individual in self.population
+        ]
+        cumulative_probabilities = [
+            sum(probabilities[:i + 1]) for i in range(self.population_size)
+        ]
         # print(f'probabilities={probabilities},cumulative_probabilities={cumulative_probabilities}')
         selected_population = []
         for _ in range(self.population_size):
             random_number = random.random()
             for i in range(self.population_size):
                 if random_number <= cumulative_probabilities[i]:
-                    selected_population.append(self.population[i]) 
+                    selected_population.append(self.population[i])
                     break
 
         self.population = selected_population
 
-    def Substitude(self):   #去掉newPop中适应度最差的解
+    def Substitude(self):  #去掉newPop中适应度最差的解
         self.newPop.sort(key=lambda individual: individual.fitness)
         self.population = self.newPop[:self.population_size]
 
     def printPop(self):
         for i in range(0, self.population_size):
-            print(f'i={i},chromosome={self.population[i].chromosome},fitness={self.population[i].fitness}')
+            print(
+                f'i={i},chromosome={self.population[i].chromosome},fitness={self.population[i].fitness}'
+            )
 
     def printNewPop(self):
         for i in range(0, len(self.newPop)):
-            print(f'newpop: i={i},chromosome={self.newPop[i].chromosome},fitness={self.newPop[i].fitness}')
+            print(
+                f'newpop: i={i},chromosome={self.newPop[i].chromosome},fitness={self.newPop[i].fitness}'
+            )
 
     def initialize_population(self):
         self.population = [
@@ -207,11 +245,11 @@ class EvolutionaryAlgorithm:
         for individual in self.newPop:
             individual.calculate_fitness(self.fitness_function, self.Matrix_D,
                                          self.Matrix_F)
-            # print(individual.fitness)        
+            # print(individual.fitness)
 
     def scramble_mutation(self):  #争夺变异，中间随机排序
         for individual in self.newPop:
-            if individual == self.best_individual: #精英保留
+            if individual == self.best_individual:  #精英保留
                 continue
             if random.random() < self.mutation_rate:  #处理变异率
                 # 随机选择一段子串
@@ -228,7 +266,7 @@ class EvolutionaryAlgorithm:
 
     def insert_mutation(self):  #插入变异，保留大部分的邻接关系，但破坏序关系
         for individual in self.newPop:
-            if individual == self.best_individual: #精英保留
+            if individual == self.best_individual:  #精英保留
                 continue
             if random.random() < self.mutation_rate:  #处理变异率
                 # 随机选取两个基因的索引
@@ -282,10 +320,10 @@ class EvolutionaryAlgorithm:
                                       1) % parent1.chromosome_length
 
                 # 更新子代
-                self.newPop.append(Individual(parent1.chromosome_length,
-                                                offspring1))
-                self.newPop.append(Individual(parent1.chromosome_length,
-                                                    offspring2))
+                self.newPop.append(
+                    Individual(parent1.chromosome_length, offspring1))
+                self.newPop.append(
+                    Individual(parent1.chromosome_length, offspring2))
 
     def cycle_crossover(self):  #圈交叉
         for i in range(0, self.population_size - 1, 2):
@@ -331,15 +369,17 @@ class EvolutionaryAlgorithm:
                     flag = not flag
 
                 # 更新子代
-                self.newPop.append(Individual(parent1.chromosome_length,
-                                                offspring1))
-                self.newPop.append(Individual(parent1.chromosome_length,
-                                                    offspring2))
+                self.newPop.append(
+                    Individual(parent1.chromosome_length, offspring1))
+                self.newPop.append(
+                    Individual(parent1.chromosome_length, offspring2))
 
                 # print(f'child1 = {offspring1}, child2 = {offspring2}')
 
 
-cnt = 0   #函数评估次数
+
+
+
 #计算总运输成本
 def getcost(D, F, perm):
     global cnt
@@ -354,36 +394,56 @@ def getcost(D, F, perm):
             total_cost += cost
     cnt += 1
     # print(f'cnt={cnt}')
+    # if(cnt == 1 or cnt % 100 == 0):
+    #     globalbest = 
     return total_cost
 
 
-def write_solutions_to_csv(solutions, filename):
+def write_solutions_to_csv(problem, solutions, filename):
     # 确定列头
-    header = ['Solution {}'.format(i+1) for i in range(len(solutions))]
+    header = ['Problem'
+              ] + ['Run {}'.format(i + 1) for i in range(len(solutions))]
+
+    # 检查文件是否存在
+    file_exists = os.path.isfile(filename)
 
     # 打开CSV文件进行写入
-    with open(filename, 'w', newline='') as file:
+    with open(filename, 'a', newline='') as file:
         writer = csv.writer(file)
 
-        # 写入列头
-        writer.writerow(header)
+        # 如果文件不存在，写入列头
+        if not file_exists:
+            writer.writerow(header)
 
         # 写入解
-        writer.writerow(solutions)
+        writer.writerow([problem] + solutions)
+    print(f'Results have been saved to {filename}')
 
 
 if __name__ == '__main__':
-    datafile = "./qapdata/tai12a.dat"
-    algorithm = EvolutionaryAlgorithm(population_size=50,
-                                      fitness_function=getcost,
-                                      mutation_rate=0.9,
-                                      crossover_rate=0.9,
-                                      data_filename=datafile)
-    results = []
-    num_runs = 2
-    for i in range(0,num_runs):
-        algorithm.run(num_generations=100)
-        results.append(algorithm.best_individual.fitness)
-    print(results)
-    filename = 'results.csv'
-    write_solutions_to_csv(results, filename)
+    datafiles = [
+        "./qapdata/tai15a.dat", 
+        "./qapdata/tai30a.dat", "./qapdata/tai60a.dat",
+        "./qapdata/tai80a.dat", 
+        "./qapdata/tai100a.dat"
+    ]
+    for datafile in datafiles:
+        cnt = 0
+        problem = datafile.split("/")[2].split(".")[0]
+
+        algorithm = EvolutionaryAlgorithm(population_size=50,
+                                          fitness_function=getcost,
+                                          mutation_rate=0.1,
+                                          crossover_rate=0.9,
+                                          data_filename=datafile)
+        results = []
+        num_runs = 25
+        for i in range(0, num_runs):
+            algorithm.run(num_generations=1000)
+            results.append(algorithm.best_individual.fitness)
+        print(results)
+        filename = f'tabu_order_scramble_results.csv'
+        write_solutions_to_csv(problem=problem,
+                               solutions=results,
+                               filename=filename)
+        print('cnt=',cnt)
