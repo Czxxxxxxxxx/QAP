@@ -56,23 +56,67 @@ class EvolutionaryAlgorithm:
 
     def run(self, num_generations):
         self.initialize_population()
+        self.evaluate_population()
+        bestin = self.getBest()
+        bestin = self.taboo_search(bestin,100)
+        self.evaluate_population()
         for i in range(1, num_generations + 1):
-            self.evaluate_population()
-            self.getBest()
             self.newPop = [self.getBest()]  #精英保留
             self.roulette_wheel_selection() #父代选择
             # self.order_crossover()          #交叉之后，newpop的数量为原数量+1（保留了1个精英）
             self.cycle_crossover()
             # self.insert_mutation()
             self.scramble_mutation()
-            self.evaluate_newPop()
+            self.evaluate_newPop()           #每一轮只做一次函数评估，在这里
             self.Substitude()
-
             print(f'generation={i},bestchrome={self.population[0].chromosome},fitness={self.population[0].fitness}')
         bestin = self.getBest()
+        global cnt
+        print(f'cnt={cnt}')
         print(f'bestchrome={bestin.chromosome},fitness={bestin.fitness}')
 
+    def taboo_search(self, individual, num_iterations): #禁忌搜索
+        tabu_list = []
+        current_individual = individual
+        best_individual = individual
 
+        for i in range(num_iterations):
+            neighbors = self.generate_neighbors(current_individual)
+            feasible_neighbors = [neighbor for neighbor in neighbors if neighbor.chromosome not in tabu_list]
+
+            # 无可行邻域，提前结束搜索
+            if not feasible_neighbors:
+                break
+            #计算适应度
+            for individual in feasible_neighbors:
+                individual.calculate_fitness(self.fitness_function, self.Matrix_D,self.Matrix_F)
+
+            current_individual = min(feasible_neighbors, key=lambda x: x.fitness)
+            if current_individual.fitness < best_individual.fitness:
+                best_individual = current_individual
+
+            tabu_list.append(current_individual.chromosome)
+            # 更新禁忌列表，保持长度不超过邻域的大小
+            if len(tabu_list) > len(neighbors):
+                tabu_list.pop(0)
+            
+            print(f'tabo:iteration={i},best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}')
+        return best_individual
+    
+    def generate_neighbors(self, individual):
+        #遍历所有可能的交换一次的情况，作为当前个体的邻居
+        neighbors = []
+        for i in range(self.chromosome_length - 1):
+            for j in range(i + 1, self.chromosome_length):
+                neighbor = self.swap_positions(individual, i, j)
+                neighbors.append(neighbor)
+        return neighbors
+    
+    def swap_positions(self, individual, i, j):
+        permutation = copy.deepcopy(individual.chromosome[:])
+        permutation[i], permutation[j] = permutation[j], permutation[i]
+        return Individual(chromosome_length=self.chromosome_length,list=permutation)
+    
     def roulette_wheel_selection(self):
         total_fitness = sum(individual.fitness for individual in self.population)
         probabilities = [individual.fitness / total_fitness for individual in self.population]
@@ -108,7 +152,6 @@ class EvolutionaryAlgorithm:
 
     def getBest(self):
         #获取种群中适应度值最低的个体
-        self.evaluate_population()
         self.best_individual = min(self.population,
                                    key=lambda individual: individual.fitness)
         return self.best_individual
@@ -295,8 +338,10 @@ class EvolutionaryAlgorithm:
                 # print(f'child1 = {offspring1}, child2 = {offspring2}')
 
 
+cnt = 0   #函数评估次数
 #计算总运输成本
 def getcost(D, F, perm):
+    global cnt
     n = len(perm)
     total_cost = 0
     for i in range(0, n):
@@ -306,15 +351,16 @@ def getcost(D, F, perm):
             distance = D[factory_i][factory_j]
             cost = F[i][j] * distance
             total_cost += cost
-    # print('totalcost=',total_cost)
+    cnt += 1
+    # print(f'cnt={cnt}')
     return total_cost
 
 
 if __name__ == '__main__':
-    datafile = "./qapdata/tai256c.dat"
+    datafile = "./qapdata/tai12a.dat"
     algorithm = EvolutionaryAlgorithm(population_size=50,
                                       fitness_function=getcost,
                                       mutation_rate=0.9,
                                       crossover_rate=0.9,
                                       data_filename=datafile)
-    algorithm.run(num_generations=10)
+    algorithm.run(num_generations=1000)
