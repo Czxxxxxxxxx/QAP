@@ -2,6 +2,7 @@ import random
 import numpy as np
 import os
 import copy
+import csv
 import math
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -356,6 +357,21 @@ def getcost(D, F, perm):
     return total_cost
 
 
+def write_solutions_to_csv(solutions, filename):
+    # 确定列头
+    header = ['Solution {}'.format(i+1) for i in range(len(solutions))]
+
+    # 打开CSV文件进行写入
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+
+        # 写入列头
+        writer.writerow(header)
+
+        # 写入解
+        writer.writerow(solutions)
+
+
 if __name__ == '__main__':
     datafile = "./qapdata/tai12a.dat"
     algorithm = EvolutionaryAlgorithm(population_size=50,
@@ -363,4 +379,11 @@ if __name__ == '__main__':
                                       mutation_rate=0.9,
                                       crossover_rate=0.9,
                                       data_filename=datafile)
-    algorithm.run(num_generations=1000)
+    results = []
+    num_runs = 2
+    for i in range(0,num_runs):
+        algorithm.run(num_generations=100)
+        results.append(algorithm.best_individual.fitness)
+    print(results)
+    filename = 'results.csv'
+    write_solutions_to_csv(results, filename)
