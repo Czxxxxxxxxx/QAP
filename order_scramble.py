@@ -60,20 +60,20 @@ class EvolutionaryAlgorithm:
         self.initialize_population()
         self.evaluate_population()
 
-        #找到初始化后，适应度值最低的个体，对其做禁忌搜索，然后在原种群中将其替换掉
-        min_fitness = float('inf')
-        min_individual = None
-        min_index = -1
-        for index, individual in enumerate(self.population):
-            fitness = individual.fitness
-            if fitness < min_fitness:
-                min_fitness = fitness
-                min_individual = individual
-                min_index = index
+        # #找到初始化后，适应度值最低的个体，对其做禁忌搜索，然后在原种群中将其替换掉
+        # min_fitness = float('inf')
+        # min_individual = None
+        # min_index = -1
+        # for index, individual in enumerate(self.population):
+        #     fitness = individual.fitness
+        #     if fitness < min_fitness:
+        #         min_fitness = fitness
+        #         min_individual = individual
+        #         min_index = index
 
-        self.best_individual = self.tabu_search(min_individual, 100)
-        self.population[min_index] = self.best_individual
-        print(f"self.best_individual.fitness={self.best_individual.fitness}")
+        # self.best_individual = self.tabu_search(min_individual, 100)
+        # self.population[min_index] = self.best_individual
+        # print(f"self.best_individual.fitness={self.best_individual.fitness}")
 
         for i in range(1, num_generations + 1):
             self.getBest()
@@ -442,7 +442,7 @@ if __name__ == '__main__':
             algorithm.run(num_generations=1000)
             results.append(algorithm.best_individual.fitness)
         print(results)
-        filename = f'tabu_order_scramble_results.csv'
+        filename = f'order_scramble_results.csv'
         write_solutions_to_csv(problem=problem,
                                solutions=results,
                                filename=filename)
