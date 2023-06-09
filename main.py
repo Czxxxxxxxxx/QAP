@@ -8,8 +8,6 @@ import math
 script_directory = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_directory)
 
-globalbest = None
-cnt = None  #函数评估次数
 class Individual:
 
     def __init__(self, chromosome_length, list=None):
@@ -32,6 +30,7 @@ class Individual:
 
     def calculate_fitness(self, fitness_function, Matrix_D, Matrix_F):
         self.fitness = fitness_function(Matrix_D, Matrix_F, self.chromosome)
+        return self.fitness
 
 
 class EvolutionaryAlgorithm:
@@ -45,19 +44,15 @@ class EvolutionaryAlgorithm:
         self.population = []
         self.newPop = []
         self.best_individual = None
+        self.num_evaluations = 0
         self.data_filename = data_filename
+        self.history = []  # 存储历史数据
         self.ReadFile()
-        print(f'self.chromosome_length={self.chromosome_length}')
-        # self.population.append(Individual(9, [1, 2, 3, 4, 5, 6, 7, 8, 9]))
-        # self.population.append(Individual(9, [9, 3, 7, 8, 2, 6, 5, 1, 4]))
-        # self.insert_mutation()
-        # self.order_crossover()
-        # self.cycle_crossover()
-        # print(self.population[0].chromosome)
-        # print(self.population[1].chromosome)
+        print(f'Solving problem in {data_filename}. self.chromosome_length={self.chromosome_length}')
 
-    def run(self, num_generations):
+    def run(self, MAX_EVALUATIONS):
         self.initialize_population()
+        self.MAX_EVALUATIONS = MAX_EVALUATIONS
         self.evaluate_population()
 
         #找到初始化后，适应度值最低的个体，对其做禁忌搜索，然后在原种群中将其替换掉
@@ -71,12 +66,14 @@ class EvolutionaryAlgorithm:
                 min_individual = individual
                 min_index = index
 
-        self.best_individual = self.tabu_search(min_individual, 100)
+        self.tabu_search(min_individual, 50)
         self.population[min_index] = self.best_individual
         print(f"self.best_individual.fitness={self.best_individual.fitness}")
-
-        for i in range(1, num_generations + 1):
-            self.getBest()
+        if self.num_evaluations >= self.MAX_EVALUATIONS:
+            print(f'bestchrome={self.best_individual.chromosome},fitness={self.best_individual.fitness},FE={self.num_evaluations}')
+            return
+        while True:
+            # self.getBest()
             self.newPop = [self.best_individual]  #精英保留
             self.roulette_wheel_selection()  #父代选择
             self.order_crossover()  #交叉之后，newpop的数量为原数量+1（保留了1个精英）
@@ -84,15 +81,16 @@ class EvolutionaryAlgorithm:
             # self.insert_mutation()
             self.scramble_mutation()
             self.evaluate_newPop()  #每一轮只做一次函数评估，在这里
+            if self.num_evaluations >= self.MAX_EVALUATIONS:
+                break
             self.Substitude()
-            print(
-                f'generation={i},bestchrome={self.population[0].chromosome},fitness={self.population[0].fitness}'
-            )
-        bestin = self.getBest()
-        global cnt
-        print(f'cnt={cnt}')
-        print(f'bestchrome={bestin.chromosome},fitness={bestin.fitness}')
+            # print(
+            #     f'generation={i},bestchrome={self.population[0].chromosome},fitness={self.population[0].fitness}'
+            # )
+        # bestin = self.getBest()
+        print(f'bestchrome={self.best_individual.chromosome},fitness={self.best_individual.fitness},FE={self.num_evaluations}')
 
+    
     def tabu_search(self, individual, num_iterations):  #禁忌搜索
         tabu_list = []
         current_individual = individual
@@ -110,26 +108,21 @@ class EvolutionaryAlgorithm:
                 break
             #计算适应度
             for individual in feasible_neighbors:
-                individual.calculate_fitness(self.fitness_function,
-                                             self.Matrix_D, self.Matrix_F)
+                self.evaluate_fitness(individual)
+                if self.num_evaluations >= self.MAX_EVALUATIONS:
+                    print(f"tabu:Reaching maximum FE {self.num_evaluations}")
+                    break
 
-            current_individual = min(feasible_neighbors,
-                                     key=lambda x: x.fitness)
-            if current_individual.fitness < best_individual.fitness:
-                best_individual = current_individual
+            if self.num_evaluations >= self.MAX_EVALUATIONS:
+                break
 
             tabu_list.append(current_individual.chromosome)
             # 更新禁忌列表，保持长度不超过邻域的大小
             if len(tabu_list) > len(neighbors):
                 tabu_list.pop(0)
-
-            # print(
-            #     f'tabu:iteration={i},best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}'
-            # )
         print(
-            f'tabu:best_ind={best_individual.chromosome},best_fitness={best_individual.fitness}'
+            f'tabu:best_ind={self.best_individual.chromosome},best_fitness={self.best_individual.fitness}'
         )
-        return best_individual
 
     def generate_neighbors(self, individual):
         #遍历所有可能的交换一次的情况，作为当前个体的邻居
@@ -189,11 +182,11 @@ class EvolutionaryAlgorithm:
             for _ in range(self.population_size)
         ]
 
-    def getBest(self):
-        #获取种群中适应度值最低的个体
-        self.best_individual = min(self.population,
-                                   key=lambda individual: individual.fitness)
-        return self.best_individual
+    # def getBest(self):
+    #     #获取种群中适应度值最低的个体
+    #     self.best_individual = min(self.population,
+    #                                key=lambda individual: individual.fitness)
+    #     return self.best_individual
 
     def AddIndidual(self, perm):
         self.population.append(Individual(len(perm), perm))
@@ -235,17 +228,33 @@ class EvolutionaryAlgorithm:
         # print(A)
         # print("\nMatrix B:")
         # print(B)
+    #函数评估，同时更新最优解
+    def evaluate_fitness(self, individual):
+        fitness = individual.calculate_fitness(self.fitness_function, self.Matrix_D,self.Matrix_F)
+        self.num_evaluations += 1
+        # 更新最优解
+        if (self.best_individual is None) or (fitness < self.best_individual.fitness):
+            self.best_individual = individual
+        # 每隔1000次函数评估打印最优解
+        if self.num_evaluations % 1000 == 0:
+            self.history.append(self.best_individual.fitness)
+            print(f"FE:{self.num_evaluations}, Current best fitness:{self.best_individual.fitness}")
+        return fitness
 
     def evaluate_population(self):
         for individual in self.population:
-            individual.calculate_fitness(self.fitness_function, self.Matrix_D,
-                                         self.Matrix_F)
-            # print(individual.fitness)
+            self.evaluate_fitness(individual)
+            if self.num_evaluations >= self.MAX_EVALUATIONS:
+                print(f"Reaching maximum FE {self.num_evaluations}")
+                break
+
     def evaluate_newPop(self):
         for individual in self.newPop:
-            individual.calculate_fitness(self.fitness_function, self.Matrix_D,
-                                         self.Matrix_F)
-            # print(individual.fitness)
+            self.evaluate_fitness(individual)
+            if self.num_evaluations >= self.MAX_EVALUATIONS:
+                print(f"Reaching maximum FE {self.num_evaluations}")
+                break
+
 
     def scramble_mutation(self):  #争夺变异，中间随机排序
         for individual in self.newPop:
@@ -382,7 +391,6 @@ class EvolutionaryAlgorithm:
 
 #计算总运输成本
 def getcost(D, F, perm):
-    global cnt
     n = len(perm)
     total_cost = 0
     for i in range(0, n):
@@ -392,10 +400,6 @@ def getcost(D, F, perm):
             distance = D[factory_i][factory_j]
             cost = F[i][j] * distance
             total_cost += cost
-    cnt += 1
-    # print(f'cnt={cnt}')
-    # if(cnt == 1 or cnt % 100 == 0):
-    #     globalbest = 
     return total_cost
 
 
@@ -419,32 +423,53 @@ def write_solutions_to_csv(problem, solutions, filename):
         writer.writerow([problem] + solutions)
     print(f'Results have been saved to {filename}')
 
+def write_history_to_csv(history, filename):
+    # 确定列头
+    header = ['FE', 'Fitness']
+    # 打开CSV文件进行写入
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+
+        # 写入列头
+        writer.writerow(header)
+
+        # 写入历史数据
+        for i, fitness in enumerate(history, start=1):
+            writer.writerow([i*1000, fitness])
+
+    print(f'History has been saved to {filename}')
 
 if __name__ == '__main__':
     datafiles = [
-        "./qapdata/tai15a.dat", 
-        "./qapdata/tai30a.dat", "./qapdata/tai60a.dat",
-        "./qapdata/tai80a.dat", 
-        "./qapdata/tai100a.dat"
+        # "./qapdata/tai15a.dat",
+        # "./qapdata/tai30a.dat",
+        # "./qapdata/tai60a.dat",
+        "./qapdata/tai80a.dat",
     ]
     for datafile in datafiles:
-        cnt = 0
         problem = datafile.split("/")[2].split(".")[0]
-
-        algorithm = EvolutionaryAlgorithm(population_size=50,
-                                          fitness_function=getcost,
-                                          mutation_rate=0.1,
-                                          crossover_rate=0.9,
-                                          data_filename=datafile)
         results = []
-        num_runs = 25
-        for i in range(0, num_runs):
-            algorithm.run(num_generations=1000)
-            results.append(algorithm.best_individual.fitness)
-        print(results)
+
         filename = f'tabu_order_scramble_results.csv'
+
+        folder_name = f'tabu_order_scramble_{problem}_history'
+        os.makedirs(folder_name, exist_ok=True)  # 创建结果文件夹，如果不存在则创建
+
+        num_runs = 2
+        for i in range(0, num_runs):
+            algorithm = EvolutionaryAlgorithm(population_size=50,
+                                              fitness_function=getcost,
+                                              mutation_rate=0.1,
+                                              crossover_rate=0.9,
+                                              data_filename=datafile)
+            algorithm.run(MAX_EVALUATIONS=10000)
+            results.append(algorithm.best_individual.fitness)
+            history_filename = f'./{folder_name}/Run{i+1}_history.csv'
+            write_history_to_csv(history=algorithm.history,filename=history_filename)
+
+        # print(results)
+
         write_solutions_to_csv(problem=problem,
                                solutions=results,
                                filename=filename)
-        print('cnt=',cnt)
     print("All experiments has been done!")
