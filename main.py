@@ -65,8 +65,8 @@ class EvolutionaryAlgorithm:
                 min_fitness = fitness
                 min_individual = individual
                 min_index = index
-
-        self.tabu_search(min_individual, 50)
+        print(f"Before tabu, best fitness = {min_fitness}")
+        self.tabu_search(min_individual, 10)
         self.population[min_index] = self.best_individual
         print(f"self.best_individual.fitness={self.best_individual.fitness}")
         if self.num_evaluations >= self.MAX_EVALUATIONS:
@@ -120,6 +120,9 @@ class EvolutionaryAlgorithm:
             # 更新禁忌列表，保持长度不超过邻域的大小
             if len(tabu_list) > len(neighbors):
                 tabu_list.pop(0)
+            # print(
+            #     f'tabu:iteration={i},best_ind={self.best_individual.chromosome},best_fitness={self.best_individual.fitness}'
+            # )
         print(
             f'tabu:best_ind={self.best_individual.chromosome},best_fitness={self.best_individual.fitness}'
         )
@@ -236,8 +239,9 @@ class EvolutionaryAlgorithm:
         if (self.best_individual is None) or (fitness < self.best_individual.fitness):
             self.best_individual = individual
         # 每隔1000次函数评估打印最优解
-        if self.num_evaluations % 1000 == 0:
+        if self.num_evaluations % 100 == 0:
             self.history.append(self.best_individual.fitness)
+        if self.num_evaluations % 1000 == 0:
             print(f"FE:{self.num_evaluations}, Current best fitness:{self.best_individual.fitness}")
         return fitness
 
@@ -425,7 +429,7 @@ def write_solutions_to_csv(problem, solutions, filename):
 
 def write_history_to_csv(history, filename):
     # 确定列头
-    header = ['FE', 'Fitness']
+    header = ['FE'] + ['Run {}'.format(i + 1) for i in range(len(history))]
     # 打开CSV文件进行写入
     with open(filename, 'w', newline='') as file:
         writer = csv.writer(file)
@@ -434,16 +438,18 @@ def write_history_to_csv(history, filename):
         writer.writerow(header)
 
         # 写入历史数据
-        for i, fitness in enumerate(history, start=1):
-            writer.writerow([i*1000, fitness])
+        max_length = max(len(run) for run in history)
+        for i in range(max_length):
+            row = [(i+1)*100] + [run[i] if i < len(run) else '' for run in history]
+            writer.writerow(row)
 
     print(f'History has been saved to {filename}')
 
 if __name__ == '__main__':
     datafiles = [
-        # "./qapdata/tai15a.dat",
-        # "./qapdata/tai30a.dat",
-        # "./qapdata/tai60a.dat",
+        "./qapdata/tai15a.dat",
+        "./qapdata/tai30a.dat",
+        "./qapdata/tai60a.dat",
         "./qapdata/tai80a.dat",
     ]
     for datafile in datafiles:
@@ -452,20 +458,22 @@ if __name__ == '__main__':
 
         filename = f'tabu_order_scramble_results.csv'
 
-        folder_name = f'tabu_order_scramble_{problem}_history'
-        os.makedirs(folder_name, exist_ok=True)  # 创建结果文件夹，如果不存在则创建
+        history_filename = f'tabu_order_scramble_{problem}_history.csv'
+        # os.makedirs(folder_name, exist_ok=True)  # 创建结果文件夹，如果不存在则创建
 
-        num_runs = 2
+        history = []  # 存储每个run的历史数据
+        num_runs = 25
         for i in range(0, num_runs):
             algorithm = EvolutionaryAlgorithm(population_size=50,
                                               fitness_function=getcost,
-                                              mutation_rate=0.1,
-                                              crossover_rate=0.9,
+                                              mutation_rate=0.05,
+                                              crossover_rate=0.8,
                                               data_filename=datafile)
-            algorithm.run(MAX_EVALUATIONS=10000)
+            algorithm.run(MAX_EVALUATIONS=100000)
             results.append(algorithm.best_individual.fitness)
-            history_filename = f'./{folder_name}/Run{i+1}_history.csv'
-            write_history_to_csv(history=algorithm.history,filename=history_filename)
+            history.append(algorithm.history)
+
+        write_history_to_csv(history=history,filename=history_filename)
 
         # print(results)
 
