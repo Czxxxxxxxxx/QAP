@@ -77,7 +77,7 @@ class EvolutionaryAlgorithm:
         while True:
             # self.getBest()
             self.newPop = [self.best_individual]  # 精英保留
-            self.roulette_wheel_selection()  # 父代选择
+            self.tournament_selection(2)  # 父代选择 2-锦标赛
             self.order_crossover()  # 交叉之后，newpop的数量为原数量+1（保留了1个精英）
             # self.cycle_crossover()
             # self.insert_mutation()
@@ -144,24 +144,13 @@ class EvolutionaryAlgorithm:
         return Individual(chromosome_length=self.chromosome_length,
                           list=permutation)
 
-    def roulette_wheel_selection(self):
-        total_fitness = sum(individual.fitness
-                            for individual in self.population)
-        probabilities = [
-            individual.fitness / total_fitness
-            for individual in self.population
-        ]
-        cumulative_probabilities = [
-            sum(probabilities[:i + 1]) for i in range(self.population_size)
-        ]
-        # print(f'probabilities={probabilities},cumulative_probabilities={cumulative_probabilities}')
+    def tournament_selection(self, tournament_size):
         selected_population = []
         for _ in range(self.population_size):
-            random_number = random.random()
-            for i in range(self.population_size):
-                if random_number <= cumulative_probabilities[i]:
-                    selected_population.append(self.population[i])
-                    break
+            tournament = random.sample(self.population, tournament_size)
+            tournament_fitness = [individual.fitness for individual in tournament]
+            winner_index = tournament_fitness.index(min(tournament_fitness))
+            selected_population.append(tournament[winner_index])
 
         self.population = selected_population
 
@@ -448,18 +437,18 @@ def write_history_to_csv(history, filename):
 
 if __name__ == '__main__':
     datafiles = [
-        "./qapdata/tai15a.dat",
-        "./qapdata/tai30a.dat",
-        "./qapdata/tai60a.dat",
+        # "./qapdata/tai15a.dat",
+        # "./qapdata/tai30a.dat",
+        # "./qapdata/tai60a.dat",
         "./qapdata/tai80a.dat",
     ]
     for datafile in datafiles:
         problem = datafile.split("/")[2].split(".")[0]
         results = []
 
-        filename = f'tabu_order_scramble_results.csv'
+        filename = f'./experimental results/tabu_order_scramble_results.csv'
 
-        history_filename = f'tabu_order_scramble_{problem}_history.csv'
+        history_filename = f'./experimental results/tabu_order_scramble_{problem}_history.csv'
         # os.makedirs(folder_name, exist_ok=True)  # 创建结果文件夹，如果不存在则创建
 
         history = []  # 存储每个run的历史数据
