@@ -437,9 +437,9 @@ def write_history_to_csv(history, filename):
 
 if __name__ == '__main__':
     datafiles = [
-        # "./qapdata/tai15a.dat",
-        # "./qapdata/tai30a.dat",
-        # "./qapdata/tai60a.dat",
+        "./qapdata/tai15a.dat",
+        "./qapdata/tai30a.dat",
+        "./qapdata/tai60a.dat",
         "./qapdata/tai80a.dat",
     ]
     for datafile in datafiles:
