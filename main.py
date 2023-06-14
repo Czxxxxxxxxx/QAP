@@ -94,7 +94,6 @@ class EvolutionaryAlgorithm:
     def tabu_search(self, individual, num_iterations):  #禁忌搜索
         tabu_list = []
         current_individual = individual
-        best_individual = individual
 
         for i in range(num_iterations):
             neighbors = self.generate_neighbors(current_individual)
@@ -106,17 +105,22 @@ class EvolutionaryAlgorithm:
             # 无可行邻域，提前结束搜索
             if not feasible_neighbors:
                 break
+
+            best_neighbor = None
             #计算适应度
             for individual in feasible_neighbors:
                 self.evaluate_fitness(individual)
+                if best_neighbor is None or individual.fitness < best_neighbor.fitness:  #找出最优邻居
+                    best_neighbor = individual
                 if self.num_evaluations >= self.MAX_EVALUATIONS:
                     print(f"tabu:Reaching maximum FE {self.num_evaluations}")
                     break
+            tabu_list.append(best_neighbor.chromosome)
+            if best_neighbor.fitness < current_individual.fitness:
+                current_individual = best_neighbor
 
             if self.num_evaluations >= self.MAX_EVALUATIONS:
                 break
-
-            tabu_list.append(current_individual.chromosome)
             # 更新禁忌列表，保持长度不超过邻域的大小
             if len(tabu_list) > len(neighbors):
                 tabu_list.pop(0)
